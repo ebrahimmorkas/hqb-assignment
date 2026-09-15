@@ -10,6 +10,8 @@ import Button from '../components/ui/Button';
 import Alert from '../components/ui/Alert';
 import Modal from '../components/ui/Modal';
 import UserForm from '../components/users/UserForm';
+import Navbar from '../components/layout/Navbar';
+import { EditIcon, PauseCircleIcon, PlayCircleIcon, TrashIcon } from '../components/ui/icons';
 
 const baseColumns = [
   { key: 'name', header: 'Name' },
@@ -48,7 +50,7 @@ const EDIT_FIELDS = {
 const CREATE_FIELDS = ['name', 'email', 'phone', 'its', 'age', 'watan', 'role', 'password'];
 
 export default function UsersPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -121,42 +123,57 @@ export default function UsersPage() {
     if (user.role === ROLES.ADMIN) {
       if (row.status !== STATUS.ACTIVE) return [];
       return [
-        { key: 'edit', label: 'Edit', onClick: setEditingUser },
-        { key: 'mark-inactive', label: 'Mark Inactive', onClick: handleMarkInactive },
+        { key: 'edit', label: 'Edit', icon: EditIcon, onClick: setEditingUser },
+        {
+          key: 'mark-inactive',
+          label: 'Mark Inactive',
+          icon: PauseCircleIcon,
+          onClick: handleMarkInactive,
+        },
       ];
     }
 
     // super-admin
     if (row.status === STATUS.ACTIVE) {
-      return [{ key: 'edit', label: 'Edit', onClick: setEditingUser }];
+      return [{ key: 'edit', label: 'Edit', icon: EditIcon, onClick: setEditingUser }];
     }
     return [
-      { key: 'mark-active', label: 'Mark Active', onClick: handleMarkActive },
-      { key: 'delete', label: 'Delete', onClick: handleDelete, variant: 'danger' },
+      {
+        key: 'mark-active',
+        label: 'Mark Active',
+        icon: PlayCircleIcon,
+        onClick: handleMarkActive,
+      },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: TrashIcon,
+        onClick: handleDelete,
+        variant: 'danger',
+      },
     ];
   };
 
+  // Admin's table only ever contains role: user rows (see canManage on the
+  // backend), so a Role column there would just repeat "user" every row -
+  // only super-admin's table (users + admins) needs it to tell rows apart.
   const columns =
     user?.role === ROLES.SUPER_ADMIN
       ? [...baseColumns, watanColumn, roleColumn, statusColumn]
-      : [...baseColumns, roleColumn, statusColumn];
+      : [...baseColumns, statusColumn];
 
   return (
-    <div className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-text">Users</h1>
-          <div className="flex items-center gap-3">
-            {user?.role === ROLES.SUPER_ADMIN && (
-              <Button className="w-auto" onClick={() => setCreating(true)}>
-                Create User
-              </Button>
-            )}
-            <Button variant="ghost" className="w-auto" onClick={logout}>
-              Log out
-            </Button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-background">
+      <Navbar>
+        {user?.role === ROLES.SUPER_ADMIN && (
+          <Button className="w-auto" onClick={() => setCreating(true)}>
+            Create User
+          </Button>
+        )}
+      </Navbar>
+
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <h1 className="mb-6 text-xl font-semibold text-text">Users</h1>
 
         <Alert>{error}</Alert>
 

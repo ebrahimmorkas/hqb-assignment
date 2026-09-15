@@ -8,11 +8,13 @@
  *   badges, fallback text for empty values, etc.
  * @param {Array<object>} data - rows to render.
  * @param {string} [rowKey='_id'] - field used as the React key per row.
- * @param {Array<{key,label,onClick,variant?}> | (row) => Array<{key,label,onClick,variant?}>} [actions=[]]
+ * @param {Array<{key,label,onClick,icon?,variant?}> | (row) => Array<{key,label,onClick,icon?,variant?}>} [actions=[]]
  *   Rendered as buttons in the Actions cell. Either a static array applied
  *   to every row, or a function of the row for per-row visibility (e.g. an
  *   action that only makes sense for a given status) - the table doesn't
- *   care which, it just resolves it per row.
+ *   care which, it just resolves it per row. `label` is always used as the
+ *   button's accessible name/tooltip; `icon` (a ReactNode) is shown instead
+ *   of the label text when provided, falling back to the label itself if not.
  * @param {string} [emptyMessage='No records found']
  */
 export default function DataTable({
@@ -61,17 +63,19 @@ export default function DataTable({
                     {rowActions.length === 0 ? (
                       <span className="text-text-muted">—</span>
                     ) : (
-                      <div className="flex gap-2">
+                      <div className="flex gap-1">
                         {rowActions.map((action) => (
                           <button
                             key={action.key}
                             type="button"
                             onClick={() => action.onClick(row)}
-                            className={`rounded-field px-2 py-1 hover:bg-primary/10 ${
+                            aria-label={action.label}
+                            title={action.label}
+                            className={`rounded-field p-1.5 hover:bg-primary/10 ${
                               action.variant === 'danger' ? 'text-danger' : 'text-primary'
                             }`}
                           >
-                            {action.label}
+                            {action.icon ?? action.label}
                           </button>
                         ))}
                       </div>

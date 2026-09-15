@@ -41,7 +41,14 @@ const config = {
     // a real cross-domain prod deployment (frontend/backend on different
     // domains) needs sameSite: 'none' + secure: true, set via env.
     sameSite: process.env.COOKIE_SAME_SITE || 'lax',
-    secure: isProd,
+    // Independent of NODE_ENV on purpose: a first deployment is often
+    // reachable only over plain HTTP (IP address, no domain/cert yet) - a
+    // Secure cookie is silently dropped by the browser over HTTP, which
+    // would make login look like it worked (Set-Cookie sent) while auth
+    // quietly breaks on the very next request. Default follows NODE_ENV,
+    // but set COOKIE_SECURE=0 explicitly to run production mode over HTTP
+    // until SSL is in place, then flip to 1 once it is.
+    secure: process.env.COOKIE_SECURE !== undefined ? process.env.COOKIE_SECURE === '1' : isProd,
   },
 };
 
