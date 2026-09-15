@@ -35,11 +35,15 @@ const getUserById = async (req, res) => {
   try {
     const user = await userService.getUserById(req.params.id);
 
-    if (!user) {
+    // Same row-visibility rule as the listing - 404 rather than 403 so a
+    // row outside what this actor can manage doesn't even confirm it exists.
+    if (!user || !canManage(req.user.role, user)) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    res.status(200).json({ success: true, data: user });
+    const visibleUser = req.user.role === ROLES.ADMIN ? stripWatan(user) : user;
+
+    res.status(200).json({ success: true, data: visibleUser });
   } catch (err) {
     logger.logException('getUserById failed', err);
     const { statusCode, message } = normalizeError(err);

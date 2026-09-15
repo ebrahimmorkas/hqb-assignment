@@ -8,7 +8,10 @@ const router = express.Router();
 // Listing every user is an admin/super-admin action - it's what feeds the
 // user management table.
 router.get('/', protect, authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN), userController.getAllUsers);
-router.get('/:id', userController.getUserById);
+// Only reached by the Edit User page (admin/super-admin) now that create/edit
+// are dedicated pages, not modals - was previously wide open with no auth at
+// all, tightened to match the same row-visibility rule getAllUsers uses.
+router.get('/:id', protect, authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN), userController.getUserById);
 // Only super-admin creates users - the form also blocks role: super-admin
 // itself (see userService.createUser), so this can't spawn a peer either.
 router.post('/', protect, authorize(ROLES.SUPER_ADMIN), userController.createUser);

@@ -1,22 +1,10 @@
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import * as userApi from '../api/userApi';
 import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
-import UserForm from '../components/users/UserForm';
-
-// Name is not self-editable - mirrors backend editableFieldsFor().
-const SELF_EDIT_FIELDS = ['email', 'phone', 'age'];
 
 export default function Profile() {
-  const { user, logout, refreshUser } = useAuth();
-  const [editing, setEditing] = useState(false);
-
-  const handleSubmit = async (data) => {
-    await userApi.updateUser(user._id, data);
-    await refreshUser();
-    setEditing(false);
-  };
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -45,7 +33,7 @@ export default function Profile() {
           </div>
         </dl>
         <div className="mt-6 flex gap-3">
-          <Button className="w-auto" onClick={() => setEditing(true)}>
+          <Button className="w-auto" onClick={() => navigate('/profile/edit')}>
             Edit
           </Button>
           <Button variant="ghost" className="w-auto" onClick={logout}>
@@ -53,18 +41,6 @@ export default function Profile() {
           </Button>
         </div>
       </div>
-
-      {editing && (
-        <Modal title="Edit Profile" onClose={() => setEditing(false)}>
-          <UserForm
-            fields={SELF_EDIT_FIELDS}
-            initialValues={user}
-            onSubmit={handleSubmit}
-            onCancel={() => setEditing(false)}
-            submitLabel="Save changes"
-          />
-        </Modal>
-      )}
     </div>
   );
 }

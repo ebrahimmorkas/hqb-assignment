@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import * as userApi from '../api/userApi';
-import * as watanApi from '../api/watanApi';
 import { ROLES } from '../constants/roles';
 import { STATUS } from '../constants/status';
 import DataTable from '../components/table/DataTable';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Alert from '../components/ui/Alert';
-import Modal from '../components/ui/Modal';
-import UserForm from '../components/users/UserForm';
 import Navbar from '../components/layout/Navbar';
 import { EditIcon, PauseCircleIcon, PlayCircleIcon, TrashIcon } from '../components/ui/icons';
 
@@ -39,24 +37,12 @@ const statusColumn = {
   ),
 };
 
-// What each actor role may edit on someone else's row - mirrors the
-// backend's editableFieldsFor() exactly, so the fields shown here are
-// always a subset of what the server will actually accept.
-const EDIT_FIELDS = {
-  [ROLES.ADMIN]: ['name', 'email', 'phone', 'age'],
-  [ROLES.SUPER_ADMIN]: ['name', 'email', 'phone', 'age', 'its', 'watan'],
-};
-
-const CREATE_FIELDS = ['name', 'email', 'phone', 'its', 'age', 'watan', 'role', 'password'];
-
 export default function UsersPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [watanOptions, setWatanOptions] = useState([]);
-  const [editingUser, setEditingUser] = useState(null);
-  const [creating, setCreating] = useState(false);
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -70,14 +56,6 @@ export default function UsersPage() {
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
-
-  useEffect(() => {
-    // Only super-admin ever sees a watan field (edit or create) - no need
-    // for admin to fetch this list at all.
-    if (user?.role === ROLES.SUPER_ADMIN) {
-      watanApi.getAllWatans().then(setWatanOptions).catch(() => setWatanOptions([]));
-    }
-  }, [user?.role]);
 
   const runAction = async (label, confirmMessage, action) => {
     if (confirmMessage && !window.confirm(confirmMessage)) return;
@@ -102,17 +80,7 @@ export default function UsersPage() {
       userApi.deleteUser(row._id)
     );
 
-  const handleEditSubmit = async (data) => {
-    await userApi.updateUser(editingUser._id, data);
-    setEditingUser(null);
-    await loadUsers();
-  };
-
-  const handleCreateSubmit = async (data) => {
-    await userApi.createUser(data);
-    setCreating(false);
-    await loadUsers();
-  };
+  const goToEdit = (row) => navigate(`/users/${row._id}/edit`);
 
   // Exactly the two rules given: admin gets Edit + Mark Inactive, but only
   // while the row is Active (nothing once it's Inactive - only a
@@ -123,7 +91,7 @@ export default function UsersPage() {
     if (user.role === ROLES.ADMIN) {
       if (row.status !== STATUS.ACTIVE) return [];
       return [
-        { key: 'edit', label: 'Edit', icon: EditIcon, onClick: setEditingUser },
+        { key: 'edit', label: 'Edit', icon: EditIcon, onClick: goToEdit },
         {
           key: 'mark-inactive',
           label: 'Mark Inactive',
@@ -135,7 +103,7 @@ export default function UsersPage() {
 
     // super-admin
     if (row.status === STATUS.ACTIVE) {
-      return [{ key: 'edit', label: 'Edit', icon: EditIcon, onClick: setEditingUser }];
+      return [{ key: 'edit', label: 'Edit', icon: EditIcon, onClick: goToEdit }];
     }
     return [
       {
@@ -166,7 +134,7 @@ export default function UsersPage() {
     <div className="min-h-screen bg-background">
       <Navbar>
         {user?.role === ROLES.SUPER_ADMIN && (
-          <Button className="w-auto" onClick={() => setCreating(true)}>
+          <Button className="w-auto" onClick={() => navigate('/users/new')}>
             Create User
           </Button>
         )}
@@ -183,31 +151,6 @@ export default function UsersPage() {
           <DataTable columns={columns} data={users} rowKey="_id" actions={getRowActions} />
         )}
       </div>
-
-      {editingUser && (
-        <Modal title={`Edit ${editingUser.name}`} onClose={() => setEditingUser(null)}>
-          <UserForm
-            fields={EDIT_FIELDS[user.role]}
-            initialValues={editingUser}
-            watanOptions={watanOptions}
-            onSubmit={handleEditSubmit}
-            onCancel={() => setEditingUser(null)}
-            submitLabel="Save changes"
-          />
-        </Modal>
-      )}
-
-      {creating && (
-        <Modal title="Create User" onClose={() => setCreating(false)}>
-          <UserForm
-            fields={CREATE_FIELDS}
-            watanOptions={watanOptions}
-            onSubmit={handleCreateSubmit}
-            onCancel={() => setCreating(false)}
-            submitLabel="Create"
-          />
-        </Modal>
-      )}
     </div>
   );
 }

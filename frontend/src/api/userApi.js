@@ -2,6 +2,8 @@ import apiRequest from './client';
 
 export const getAllUsers = () => apiRequest('/users');
 
+export const getUserById = (id) => apiRequest(`/users/${id}`);
+
 export const createUser = (data) => apiRequest('/users', { method: 'POST', body: data });
 
 export const updateUser = (id, data) => apiRequest(`/users/${id}`, { method: 'PUT', body: data });
