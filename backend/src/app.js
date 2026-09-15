@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const routes = require('./routes');
 const config = require('./config/env');
 const logger = require('./utils/logger');
+const normalizeError = require('./utils/normalizeError');
 const requestLogger = require('./middlewares/requestLogger');
 
 const app = express();
@@ -26,13 +27,12 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
 
-// Central error handler
+// Central error handler - last resort for errors that never reached a
+// controller's own try/catch (e.g. thrown synchronously in middleware).
 app.use((err, req, res, next) => {
   logger.logException('Unhandled request error', { err });
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || 'Internal server error',
-  });
+  const { statusCode, message } = normalizeError(err);
+  res.status(statusCode).json({ success: false, message });
 });
 
 module.exports = app;

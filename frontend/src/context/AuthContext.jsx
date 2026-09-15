@@ -36,8 +36,19 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Re-pulls /auth/me - used after a self-edit so the displayed profile
+  // (and anywhere else `user` is read from this context) reflects the save
+  // without a full page reload.
+  const refreshUser = useCallback(async () => {
+    const data = await authApi.getMe();
+    setUser(data.user);
+    return data.user;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, logout, refreshUser, isAuthenticated: !!user }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -9,8 +9,18 @@ const router = express.Router();
 // user management table.
 router.get('/', protect, authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN), userController.getAllUsers);
 router.get('/:id', userController.getUserById);
-router.post('/', userController.createUser);
-router.put('/:id', protect, authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN), userController.updateUser);
+// Only super-admin creates users - the form also blocks role: super-admin
+// itself (see userService.createUser), so this can't spawn a peer either.
+router.post('/', protect, authorize(ROLES.SUPER_ADMIN), userController.createUser);
+// All three roles can reach this - a plain 'user' can only ever pass
+// canEdit() for their own row (see userService.updateUser / canEdit), so
+// this is really "self-edit, or manage a row you're allowed to manage".
+router.put(
+  '/:id',
+  protect,
+  authorize(ROLES.USER, ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  userController.updateUser
+);
 
 // Status transitions - each restricted to the one role that owns that
 // action (see userService.js's TRANSITIONS table for the full state

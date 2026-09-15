@@ -1,13 +1,13 @@
 import Input from './Input';
+import PasswordInput from './PasswordInput';
+import FieldWrapper from './FieldWrapper';
 
 export default function FormField({ label, error, id, ...inputProps }) {
+  const Field = inputProps.type === 'password' ? PasswordInput : Input;
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-text">
-        {label}
-      </label>
-      <Input id={id} hasError={!!error} {...inputProps} />
-      {error && <span className="text-sm text-danger">{error}</span>}
-    </div>
+    <FieldWrapper label={label} id={id} error={error}>
+      <Field id={id} hasError={!!error} {...inputProps} />
+    </FieldWrapper>
   );
 }

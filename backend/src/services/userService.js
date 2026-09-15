@@ -3,7 +3,7 @@ const redisService = require('./redisService');
 const redisKeys = require('../utils/redisKeys');
 const logger = require('../utils/logger');
 const ApiError = require('../utils/ApiError');
-const { canManage } = require('../utils/userPermissions');
+const { canManage, canEdit, editableFieldsFor } = require('../utils/userPermissions');
 const { ROLES } = require('../constants/roles');
 const { STATUS } = require('../constants/status');
 
@@ -49,6 +49,13 @@ async function getUserById(id) {
 
 async function createUser(data) {
   try {
+    // Only super-admin can even reach this (route-gated), but don't trust
+    // that alone - block spawning another super-admin through this form
+    // regardless of who's calling it.
+    if (data.role === ROLES.SUPER_ADMIN) {
+      throw new ApiError(400, 'Cannot create a super-admin user');
+    }
+
     const user = await User.create(data);
 
     // Invalidate the list cache so the new user shows up on next read.
@@ -73,7 +80,7 @@ async function updateUser(id, data, actor) {
 
     if (!existing) return null;
 
-    if (!canManage(actor.role, existing)) {
+    if (!canEdit(actor.role, actor.id, existing)) {
       throw new ApiError(403, 'Forbidden');
     }
 
@@ -83,7 +90,16 @@ async function updateUser(id, data, actor) {
       throw new ApiError(400, 'Only active users can be edited');
     }
 
-    const user = await User.findByIdAndUpdate(id, data, {
+    // Silently drop anything outside the actor's allowed field set, rather
+    // than erroring - an admin's edit request may legitimately still carry
+    // its/watan in the payload (unchanged, from the form's initial values)
+    // even though they're not allowed to be the one to change them.
+    const allowedFields = editableFieldsFor(actor.role);
+    const sanitizedData = Object.fromEntries(
+      Object.entries(data).filter(([key]) => allowedFields.includes(key))
+    );
+
+    const user = await User.findByIdAndUpdate(id, sanitizedData, {
       new: true,
       runValidators: true,
     })

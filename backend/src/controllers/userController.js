@@ -1,12 +1,14 @@
 const userService = require('../services/userService');
 const logger = require('../utils/logger');
+const normalizeError = require('../utils/normalizeError');
 const { ROLES } = require('../constants/roles');
 const { canManage } = require('../utils/userPermissions');
 
 // Convention: every controller function has its own try/catch. On error we
-// log via logger.logException and send an error response - the frontend
-// uses that response to redirect the user to the error page. No caching or
-// DB logic lives here, that's the service layer's job.
+// log via logger.logException, normalize it to an HTTP status via
+// normalizeError, and send an error response - the frontend uses the
+// status to decide whether to show it inline (400) or redirect to a
+// dedicated error page (403/500).
 
 const stripWatan = ({ watan, ...rest }) => rest;
 
@@ -24,10 +26,8 @@ const getAllUsers = async (req, res) => {
     res.status(200).json({ success: true, data: visibleUsers });
   } catch (err) {
     logger.logException('getAllUsers failed', err);
-    res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-    });
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
   }
 };
 
@@ -42,10 +42,8 @@ const getUserById = async (req, res) => {
     res.status(200).json({ success: true, data: user });
   } catch (err) {
     logger.logException('getUserById failed', err);
-    res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-    });
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
   }
 };
 
@@ -55,10 +53,8 @@ const createUser = async (req, res) => {
     res.status(201).json({ success: true, data: user });
   } catch (err) {
     logger.logException('createUser failed', err);
-    res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-    });
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
   }
 };
 
@@ -73,10 +69,8 @@ const updateUser = async (req, res) => {
     res.status(200).json({ success: true, data: user });
   } catch (err) {
     logger.logException('updateUser failed', err);
-    res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-    });
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
   }
 };
 
@@ -93,10 +87,8 @@ const handleStatusChange = (serviceMethod, failLabel) => async (req, res) => {
     res.status(200).json({ success: true, data: user });
   } catch (err) {
     logger.logException(failLabel, err);
-    res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-    });
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
   }
 };
 

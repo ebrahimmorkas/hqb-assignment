@@ -8,6 +8,8 @@
  * /auth/refresh once and retries the original request before giving up.
  */
 
+import { redirectTo } from '../utils/navigation';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export class ApiError extends Error {
@@ -64,6 +66,7 @@ export async function apiRequest(path, { method = 'GET', body, _isRetry = false 
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
+    redirectTo('/error');
     throw new ApiError('Unable to reach the server. Please check your connection.', 0);
   }
 
@@ -82,6 +85,16 @@ export async function apiRequest(path, { method = 'GET', body, _isRetry = false 
       return apiRequest(path, { method, body, _isRetry: true });
     }
     sessionExpiredHandler?.();
+  }
+
+  // 400 (validation) stays inline for the caller to show in its own form;
+  // 401 is handled above (refresh-and-retry then session-expired). 403 and
+  // 5xx aren't recoverable by editing input, so send the user to a
+  // dedicated error page instead of an inline message.
+  if (response.status === 403) {
+    redirectTo('/forbidden');
+  } else if (response.status >= 500) {
+    redirectTo('/error');
   }
 
   if (!response.ok || payload?.success === false) {

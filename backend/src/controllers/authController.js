@@ -2,6 +2,7 @@ const authService = require('../services/authService');
 const userService = require('../services/userService');
 const config = require('../config/env');
 const logger = require('../utils/logger');
+const normalizeError = require('../utils/normalizeError');
 
 // Cookie options are HTTP-specific, so they live here (controller), not in
 // the service. The refresh cookie's path is scoped to /api/auth so it is
@@ -42,10 +43,8 @@ const login = async (req, res) => {
     res.status(200).json({ success: true, data: { user } });
   } catch (err) {
     logger.logException('login failed', err);
-    res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-    });
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
   }
 };
 
@@ -62,10 +61,8 @@ const refresh = async (req, res) => {
     // A failed refresh means the session can't continue - clear whatever
     // cookies exist so the frontend cleanly falls back to the login screen.
     clearAuthCookies(res);
-    res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-    });
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
   }
 };
 
@@ -76,10 +73,8 @@ const logout = async (req, res) => {
     res.status(200).json({ success: true, message: 'Logged out' });
   } catch (err) {
     logger.logException('logout failed', err);
-    res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-    });
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
   }
 };
 
@@ -94,10 +89,8 @@ const me = async (req, res) => {
     res.status(200).json({ success: true, data: { user } });
   } catch (err) {
     logger.logException('me failed', err);
-    res.status(err.statusCode || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-    });
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
   }
 };
 

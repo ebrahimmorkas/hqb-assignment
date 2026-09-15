@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import * as userApi from '../api/userApi';
+import * as watanApi from '../api/watanApi';
 import { ROLES } from '../constants/roles';
 import { STATUS } from '../constants/status';
 import DataTable from '../components/table/DataTable';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Alert from '../components/ui/Alert';
+import Modal from '../components/ui/Modal';
+import UserForm from '../components/users/UserForm';
 
 const baseColumns = [
   { key: 'name', header: 'Name' },
@@ -34,11 +37,24 @@ const statusColumn = {
   ),
 };
 
+// What each actor role may edit on someone else's row - mirrors the
+// backend's editableFieldsFor() exactly, so the fields shown here are
+// always a subset of what the server will actually accept.
+const EDIT_FIELDS = {
+  [ROLES.ADMIN]: ['name', 'email', 'phone', 'age'],
+  [ROLES.SUPER_ADMIN]: ['name', 'email', 'phone', 'age', 'its', 'watan'],
+};
+
+const CREATE_FIELDS = ['name', 'email', 'phone', 'its', 'age', 'watan', 'role', 'password'];
+
 export default function UsersPage() {
   const { user, logout } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [watanOptions, setWatanOptions] = useState([]);
+  const [editingUser, setEditingUser] = useState(null);
+  const [creating, setCreating] = useState(false);
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -53,6 +69,14 @@ export default function UsersPage() {
     loadUsers();
   }, [loadUsers]);
 
+  useEffect(() => {
+    // Only super-admin ever sees a watan field (edit or create) - no need
+    // for admin to fetch this list at all.
+    if (user?.role === ROLES.SUPER_ADMIN) {
+      watanApi.getAllWatans().then(setWatanOptions).catch(() => setWatanOptions([]));
+    }
+  }, [user?.role]);
+
   const runAction = async (label, confirmMessage, action) => {
     if (confirmMessage && !window.confirm(confirmMessage)) return;
 
@@ -63,12 +87,6 @@ export default function UsersPage() {
     } catch (err) {
       setError(err.message || `${label} failed`);
     }
-  };
-
-  const handleEdit = (row) => {
-    // Edit form isn't built yet - the button is wired to reach this point,
-    // and only shows for rows the visibility rule below permits.
-    console.log('Edit requested for', row._id);
   };
 
   const handleMarkInactive = (row) =>
@@ -82,6 +100,18 @@ export default function UsersPage() {
       userApi.deleteUser(row._id)
     );
 
+  const handleEditSubmit = async (data) => {
+    await userApi.updateUser(editingUser._id, data);
+    setEditingUser(null);
+    await loadUsers();
+  };
+
+  const handleCreateSubmit = async (data) => {
+    await userApi.createUser(data);
+    setCreating(false);
+    await loadUsers();
+  };
+
   // Exactly the two rules given: admin gets Edit + Mark Inactive, but only
   // while the row is Active (nothing once it's Inactive - only a
   // super-admin can act on it from there). Super-admin gets Edit while
@@ -91,14 +121,14 @@ export default function UsersPage() {
     if (user.role === ROLES.ADMIN) {
       if (row.status !== STATUS.ACTIVE) return [];
       return [
-        { key: 'edit', label: 'Edit', onClick: handleEdit },
+        { key: 'edit', label: 'Edit', onClick: setEditingUser },
         { key: 'mark-inactive', label: 'Mark Inactive', onClick: handleMarkInactive },
       ];
     }
 
     // super-admin
     if (row.status === STATUS.ACTIVE) {
-      return [{ key: 'edit', label: 'Edit', onClick: handleEdit }];
+      return [{ key: 'edit', label: 'Edit', onClick: setEditingUser }];
     }
     return [
       { key: 'mark-active', label: 'Mark Active', onClick: handleMarkActive },
@@ -116,9 +146,16 @@ export default function UsersPage() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-xl font-semibold text-text">Users</h1>
-          <Button variant="ghost" className="w-auto" onClick={logout}>
-            Log out
-          </Button>
+          <div className="flex items-center gap-3">
+            {user?.role === ROLES.SUPER_ADMIN && (
+              <Button className="w-auto" onClick={() => setCreating(true)}>
+                Create User
+              </Button>
+            )}
+            <Button variant="ghost" className="w-auto" onClick={logout}>
+              Log out
+            </Button>
+          </div>
         </div>
 
         <Alert>{error}</Alert>
@@ -129,6 +166,31 @@ export default function UsersPage() {
           <DataTable columns={columns} data={users} rowKey="_id" actions={getRowActions} />
         )}
       </div>
+
+      {editingUser && (
+        <Modal title={`Edit ${editingUser.name}`} onClose={() => setEditingUser(null)}>
+          <UserForm
+            fields={EDIT_FIELDS[user.role]}
+            initialValues={editingUser}
+            watanOptions={watanOptions}
+            onSubmit={handleEditSubmit}
+            onCancel={() => setEditingUser(null)}
+            submitLabel="Save changes"
+          />
+        </Modal>
+      )}
+
+      {creating && (
+        <Modal title="Create User" onClose={() => setCreating(false)}>
+          <UserForm
+            fields={CREATE_FIELDS}
+            watanOptions={watanOptions}
+            onSubmit={handleCreateSubmit}
+            onCancel={() => setCreating(false)}
+            submitLabel="Create"
+          />
+        </Modal>
+      )}
     </div>
   );
 }

@@ -66,6 +66,17 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Watan is required'],
       trim: true,
+      // Kept as a plain string (not a WatanMaster ObjectId ref) so the table
+      // and this schema don't need a populate() on every read - validated
+      // against the master list instead, so only a value that exists there
+      // can ever be stored.
+      validate: {
+        validator: async function isKnownWatan(value) {
+          const WatanMaster = mongoose.model('WatanMaster');
+          return Boolean(await WatanMaster.exists({ name: value }));
+        },
+        message: 'Watan must be a valid selection from the watan master list',
+      },
     },
     role: {
       type: String,
