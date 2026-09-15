@@ -45,7 +45,9 @@ const userSchema = new mongoose.Schema(
     its: {
       type: String,
       required: [true, 'ITS is required'],
-      unique: true,
+      // Uniqueness is enforced below via a partial index (only among
+      // non-deleted users), not here - a plain `unique: true` would keep a
+      // deleted user's ITS permanently reserved forever.
       trim: true,
       validate: {
         validator: (value) => ITS_REGEX.test(value),
@@ -117,6 +119,16 @@ const userSchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
+);
+
+// Partial unique index: ITS only has to be unique among users that aren't
+// soft-deleted, so once a user is deleted their ITS becomes available for a
+// brand new account to reuse.
+userSchema.index(
+  { its: 1 },
+  // MongoDB partial-index filters don't support $ne/$not - list the
+  // non-deleted statuses instead of excluding the deleted one.
+  { unique: true, partialFilterExpression: { status: { $in: [STATUS.ACTIVE, STATUS.INACTIVE] } } }
 );
 
 userSchema.pre('save', async function hashPassword() {
