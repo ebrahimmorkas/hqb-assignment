@@ -2,6 +2,10 @@ const User = require('../models/User');
 const redisService = require('./redisService');
 const redisKeys = require('../utils/redisKeys');
 const logger = require('../utils/logger');
+const ApiError = require('../utils/ApiError');
+const { canManage } = require('../utils/userPermissions');
+const { ROLES } = require('../constants/roles');
+const { STATUS } = require('../constants/status');
 
 // Controllers only ever call these methods - caching is an implementation
 // detail of the service layer. Whether Redis is on or off, callers get back
@@ -13,8 +17,12 @@ const logger = require('../utils/logger');
 
 async function getAllUsers() {
   try {
+    // Deleted (status D) is permanent-from-the-UI's-perspective: excluded at
+    // the query itself, not just filtered client-side, and cached that way.
     const users = await redisService.getOrSet(redisKeys.userList(), () =>
-      User.find().select('-password').lean()
+      User.find({ status: { $ne: STATUS.DELETED } })
+        .select('-password')
+        .lean()
     );
 
     logger.logInfo(1, 0, 'Fetched all users', { count: users.length });
@@ -49,7 +57,7 @@ async function createUser(data) {
     // toObject() on a freshly-created document includes every field
     // regardless of schema-level select:false (that flag only prunes fields
     // on a *queried* document, not one already in hand) - strip manually.
-    const { password, tokenVersion, ...safeUser } = user.toObject();
+    const { password, tokenVersion, statusAudit, ...safeUser } = user.toObject();
 
     logger.logInfo(1, 0, 'User created', { id: safeUser._id, email: safeUser.email });
 
@@ -59,8 +67,22 @@ async function createUser(data) {
   }
 }
 
-async function updateUser(id, data) {
+async function updateUser(id, data, actor) {
   try {
+    const existing = await User.findById(id);
+
+    if (!existing) return null;
+
+    if (!canManage(actor.role, existing)) {
+      throw new ApiError(403, 'Forbidden');
+    }
+
+    // Edit is only offered in the UI while a row is Active - enforced here
+    // too, so a direct API call can't bypass that.
+    if (existing.status !== STATUS.ACTIVE) {
+      throw new ApiError(400, 'Only active users can be edited');
+    }
+
     const user = await User.findByIdAndUpdate(id, data, {
       new: true,
       runValidators: true,
@@ -68,14 +90,12 @@ async function updateUser(id, data) {
       .select('-password')
       .lean();
 
-    if (user) {
-      await Promise.all([
-        redisService.del(redisKeys.userById(id)),
-        redisService.del(redisKeys.userList()),
-      ]);
-    }
+    await Promise.all([
+      redisService.del(redisKeys.userById(id)),
+      redisService.del(redisKeys.userList()),
+    ]);
 
-    logger.logInfo(!!user, !user, 'User update', { id, found: !!user });
+    logger.logInfo(1, 0, 'User update', { id });
 
     return user;
   } catch (err) {
@@ -83,29 +103,82 @@ async function updateUser(id, data) {
   }
 }
 
-async function deleteUser(id) {
+// One rule per target status: who may set it, what the row must currently
+// be, and which rows they're allowed to touch at all (canManage - the same
+// rule the users-list row filter uses).
+const TRANSITIONS = {
+  [STATUS.INACTIVE]: {
+    actionName: 'markUserInactive',
+    allowedActorRoles: [ROLES.ADMIN],
+    requiredCurrentStatus: STATUS.ACTIVE,
+  },
+  [STATUS.ACTIVE]: {
+    actionName: 'markUserActive',
+    allowedActorRoles: [ROLES.SUPER_ADMIN],
+    requiredCurrentStatus: STATUS.INACTIVE,
+  },
+  [STATUS.DELETED]: {
+    actionName: 'deleteUser',
+    allowedActorRoles: [ROLES.SUPER_ADMIN],
+    requiredCurrentStatus: STATUS.INACTIVE,
+  },
+};
+
+async function changeUserStatus(id, targetStatus, actor) {
   try {
-    const user = await User.findByIdAndDelete(id).select('-password').lean();
+    const rule = TRANSITIONS[targetStatus];
 
-    if (user) {
-      await Promise.all([
-        redisService.del(redisKeys.userById(id)),
-        redisService.del(redisKeys.userList()),
-      ]);
+    if (!rule.allowedActorRoles.includes(actor.role)) {
+      throw new ApiError(403, 'Forbidden');
     }
 
-    logger.logInfo(!!user, !user, 'User delete', { id, found: !!user });
+    const user = await User.findById(id).select('+statusAudit');
 
-    return user;
+    if (!user) return null;
+
+    if (!canManage(actor.role, user)) {
+      throw new ApiError(403, 'Forbidden');
+    }
+
+    if (user.status !== rule.requiredCurrentStatus) {
+      throw new ApiError(
+        400,
+        `User must have status "${rule.requiredCurrentStatus}" for this action`
+      );
+    }
+
+    user.status = targetStatus;
+    user.statusAudit.push({ status: targetStatus, changedBy: actor.id, changedAt: new Date() });
+    await user.save();
+
+    await Promise.all([
+      redisService.del(redisKeys.userById(id)),
+      redisService.del(redisKeys.userList()),
+    ]);
+
+    logger.logInfo(1, 0, rule.actionName, { id, targetStatus, changedBy: actor.id });
+
+    const safeUser = user.toObject();
+    delete safeUser.password;
+    delete safeUser.tokenVersion;
+    delete safeUser.statusAudit;
+
+    return safeUser;
   } catch (err) {
     throw err;
   }
 }
+
+const markUserInactive = (id, actor) => changeUserStatus(id, STATUS.INACTIVE, actor);
+const markUserActive = (id, actor) => changeUserStatus(id, STATUS.ACTIVE, actor);
+const deleteUser = (id, actor) => changeUserStatus(id, STATUS.DELETED, actor);
 
 module.exports = {
   getAllUsers,
   getUserById,
   createUser,
   updateUser,
+  markUserInactive,
+  markUserActive,
   deleteUser,
 };

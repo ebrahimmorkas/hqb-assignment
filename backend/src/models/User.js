@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { ROLE_VALUES, ROLES } = require('../constants/roles');
+const { STATUS, STATUS_VALUES } = require('../constants/status');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^\d{7,15}$/;
@@ -82,6 +83,25 @@ const userSchema = new mongoose.Schema(
     tokenVersion: {
       type: Number,
       default: 0,
+      select: false,
+    },
+    status: {
+      type: String,
+      enum: { values: STATUS_VALUES, message: 'Status must be one of: ' + STATUS_VALUES.join(', ') },
+      default: STATUS.ACTIVE,
+    },
+    // One entry per status change (not exposed by default - see select:
+    // false). Who did it and when, for every A/I/D transition.
+    statusAudit: {
+      type: [
+        {
+          _id: false,
+          status: { type: String, enum: STATUS_VALUES, required: true },
+          changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+          changedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
       select: false,
     },
   },

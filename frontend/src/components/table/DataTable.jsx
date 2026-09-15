@@ -8,10 +8,11 @@
  *   badges, fallback text for empty values, etc.
  * @param {Array<object>} data - rows to render.
  * @param {string} [rowKey='_id'] - field used as the React key per row.
- * @param {Array<{key: string, label: string, onClick: (row) => void, variant?: string}>} [actions=[]]
- *   Rendered as buttons in the Actions cell of every row. Empty by default -
- *   the column still renders, just with a placeholder, until actions are
- *   wired up.
+ * @param {Array<{key,label,onClick,variant?}> | (row) => Array<{key,label,onClick,variant?}>} [actions=[]]
+ *   Rendered as buttons in the Actions cell. Either a static array applied
+ *   to every row, or a function of the row for per-row visibility (e.g. an
+ *   action that only makes sense for a given status) - the table doesn't
+ *   care which, it just resolves it per row.
  * @param {string} [emptyMessage='No records found']
  */
 export default function DataTable({
@@ -45,34 +46,40 @@ export default function DataTable({
               </td>
             </tr>
           ) : (
-            data.map((row, index) => (
-              <tr key={row[rowKey] ?? index} className="border-b border-border last:border-0">
-                <td className="px-4 py-3 text-text-muted">{index + 1}</td>
-                {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-3 text-text">
-                    {col.render ? col.render(row) : (row[col.key] ?? '—')}
+            data.map((row, index) => {
+              const rowActions = typeof actions === 'function' ? actions(row) : actions;
+
+              return (
+                <tr key={row[rowKey] ?? index} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3 text-text-muted">{index + 1}</td>
+                  {columns.map((col) => (
+                    <td key={col.key} className="px-4 py-3 text-text">
+                      {col.render ? col.render(row) : (row[col.key] ?? '—')}
+                    </td>
+                  ))}
+                  <td className="px-4 py-3">
+                    {rowActions.length === 0 ? (
+                      <span className="text-text-muted">—</span>
+                    ) : (
+                      <div className="flex gap-2">
+                        {rowActions.map((action) => (
+                          <button
+                            key={action.key}
+                            type="button"
+                            onClick={() => action.onClick(row)}
+                            className={`rounded-field px-2 py-1 hover:bg-primary/10 ${
+                              action.variant === 'danger' ? 'text-danger' : 'text-primary'
+                            }`}
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </td>
-                ))}
-                <td className="px-4 py-3">
-                  {actions.length === 0 ? (
-                    <span className="text-text-muted">—</span>
-                  ) : (
-                    <div className="flex gap-2">
-                      {actions.map((action) => (
-                        <button
-                          key={action.key}
-                          type="button"
-                          onClick={() => action.onClick(row)}
-                          className="rounded-field px-2 py-1 text-primary hover:bg-primary/10"
-                        >
-                          {action.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
