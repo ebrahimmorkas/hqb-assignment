@@ -46,7 +46,10 @@ async function createUser(data) {
     // Invalidate the list cache so the new user shows up on next read.
     await redisService.del(redisKeys.userList());
 
-    const { password, ...safeUser } = user.toObject();
+    // toObject() on a freshly-created document includes every field
+    // regardless of schema-level select:false (that flag only prunes fields
+    // on a *queried* document, not one already in hand) - strip manually.
+    const { password, tokenVersion, ...safeUser } = user.toObject();
 
     logger.logInfo(1, 0, 'User created', { id: safeUser._id, email: safeUser.email });
 

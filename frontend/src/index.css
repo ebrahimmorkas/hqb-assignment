@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens - the single place to change how the whole app looks.
+ * Every reusable component (Button, Input, Card, ...) is built from these
+ * Tailwind theme colors/radii instead of hardcoded hex values, so changing
+ * a token here restyles every screen that uses it.
+ */
+@theme {
+  --color-primary: #4f46e5;
+  --color-primary-hover: #4338ca;
+  --color-primary-fg: #ffffff;
+
+  --color-surface: #ffffff;
+  --color-background: #f8fafc;
+  --color-border: #e2e8f0;
+
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+
+  --color-danger: #dc2626;
+  --color-danger-bg: #fef2f2;
+
+  --radius-field: 0.5rem;
+  --radius-card: 0.75rem;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+}

@@ -1,13 +1,18 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const routes = require('./routes');
+const config = require('./config/env');
 const logger = require('./utils/logger');
 const requestLogger = require('./middlewares/requestLogger');
 
 const app = express();
 
-app.use(cors());
+// credentials:true + an explicit origin (never '*') are both required for
+// the browser to send/accept the httpOnly auth cookies cross-origin.
+app.use(cors({ origin: config.frontendUrl, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(requestLogger);
 
 app.use('/api', routes);
