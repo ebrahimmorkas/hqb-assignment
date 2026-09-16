@@ -8,6 +8,10 @@ const router = express.Router();
 // Listing every user is an admin/super-admin action - it's what feeds the
 // user management table.
 router.get('/', protect, authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN), userController.getAllUsers);
+// Sidebar "find by ITS" flow (Update/Mark Active/Delete/Mark Inactive all
+// start here). Declared before /:id - different segment count, so no actual
+// routing ambiguity, but keeping the more specific path first is clearer.
+router.get('/its/:its', protect, authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN), userController.getUserByIts);
 // Only reached by the Edit User page (admin/super-admin) now that create/edit
 // are dedicated pages, not modals - was previously wide open with no auth at
 // all, tightened to match the same row-visibility rule getAllUsers uses.
@@ -25,13 +29,15 @@ router.put(
   userController.updateUser
 );
 
-// Status transitions - each restricted to the one role that owns that
-// action (see userService.js's TRANSITIONS table for the full state
-// machine: who, from what status, to what status).
+// Status transitions - route-level authorize() only narrows to "admin or
+// super-admin can even attempt this"; the fine-grained rule (admin acts on
+// role:user targets, super-admin bypasses onto role:admin targets) lives in
+// userService.js's TRANSITIONS table, since it depends on the target row's
+// role too, not just the actor's.
 router.patch(
   '/:id/mark-inactive',
   protect,
-  authorize(ROLES.ADMIN),
+  authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN),
   userController.markInactive
 );
 router.patch(

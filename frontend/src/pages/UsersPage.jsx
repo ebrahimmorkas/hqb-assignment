@@ -6,9 +6,8 @@ import { ROLES } from '../constants/roles';
 import { STATUS } from '../constants/status';
 import DataTable from '../components/table/DataTable';
 import Badge from '../components/ui/Badge';
-import Button from '../components/ui/Button';
 import Alert from '../components/ui/Alert';
-import Navbar from '../components/layout/Navbar';
+import AdminLayout from '../components/layout/AdminLayout';
 import { EditIcon, PauseCircleIcon, PlayCircleIcon, TrashIcon } from '../components/ui/icons';
 
 const baseColumns = [
@@ -31,7 +30,7 @@ const statusColumn = {
   key: 'status',
   header: 'Status',
   render: (row) => (
-    <Badge tone={row.status === STATUS.ACTIVE ? 'primary' : 'gray'}>
+    <Badge tone={row.status === STATUS.ACTIVE ? 'success' : 'gray'}>
       {row.status === STATUS.ACTIVE ? 'Active' : 'Inactive'}
     </Badge>
   ),
@@ -43,6 +42,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -57,35 +57,53 @@ export default function UsersPage() {
     loadUsers();
   }, [loadUsers]);
 
-  const runAction = async (label, confirmMessage, action) => {
+  const runAction = async (label, confirmMessage, successMessage, action) => {
     if (confirmMessage && !window.confirm(confirmMessage)) return;
 
     setError('');
+    setSuccess('');
     try {
       await action();
       await loadUsers();
+      setSuccess(successMessage);
     } catch (err) {
       setError(err.message || `${label} failed`);
     }
   };
 
   const handleMarkInactive = (row) =>
-    runAction('Mark inactive', `Mark ${row.name} inactive?`, () => userApi.markUserInactive(row._id));
+    runAction(
+      'Mark inactive',
+      `Mark ${row.name} inactive?`,
+      `${row.name} marked inactive.`,
+      () => userApi.markUserInactive(row._id)
+    );
 
   const handleMarkActive = (row) =>
-    runAction('Mark active', `Mark ${row.name} active?`, () => userApi.markUserActive(row._id));
+    runAction(
+      'Mark active',
+      `Mark ${row.name} active?`,
+      `${row.name} marked active.`,
+      () => userApi.markUserActive(row._id)
+    );
 
   const handleDelete = (row) =>
-    runAction('Delete', `Delete ${row.name}? This cannot be undone from this screen.`, () =>
-      userApi.deleteUser(row._id)
+    runAction(
+      'Delete',
+      `Delete ${row.name}? This cannot be undone from this screen.`,
+      `${row.name} deleted.`,
+      () => userApi.deleteUser(row._id)
     );
 
   const goToEdit = (row) => navigate(`/users/${row._id}/edit`);
 
-  // Exactly the two rules given: admin gets Edit + Mark Inactive, but only
-  // while the row is Active (nothing once it's Inactive - only a
-  // super-admin can act on it from there). Super-admin gets Edit while
-  // Active, or Mark Active + Delete while Inactive - never Edit alongside
+  // Admin: Edit + Mark Inactive, but only while the row is Active - nothing
+  // once it's Inactive (only a super-admin can act on it from there).
+  //
+  // Super-admin: Edit while Active - PLUS Mark Inactive, but only for a
+  // role: admin row, since a regular admin can never manage another admin's
+  // row at all, so super-admin is the only one who can ever deactivate one
+  // (the bypass). While Inactive: Mark Active + Delete, never Edit alongside
   // those two.
   const getRowActions = (row) => {
     if (user.role === ROLES.ADMIN) {
@@ -103,7 +121,16 @@ export default function UsersPage() {
 
     // super-admin
     if (row.status === STATUS.ACTIVE) {
-      return [{ key: 'edit', label: 'Edit', icon: EditIcon, onClick: goToEdit }];
+      const actions = [{ key: 'edit', label: 'Edit', icon: EditIcon, onClick: goToEdit }];
+      if (row.role === ROLES.ADMIN) {
+        actions.push({
+          key: 'mark-inactive',
+          label: 'Mark Inactive',
+          icon: PauseCircleIcon,
+          onClick: handleMarkInactive,
+        });
+      }
+      return actions;
     }
     return [
       {
@@ -131,26 +158,19 @@ export default function UsersPage() {
       : [...baseColumns, statusColumn];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar>
-        {user?.role === ROLES.SUPER_ADMIN && (
-          <Button className="w-auto" onClick={() => navigate('/users/new')}>
-            Create User
-          </Button>
-        )}
-      </Navbar>
+    <AdminLayout title="Users">
+      <Alert tone="danger" onClose={() => setError('')}>
+        {error}
+      </Alert>
+      <Alert tone="success" onClose={() => setSuccess('')}>
+        {success}
+      </Alert>
 
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <h1 className="mb-6 text-xl font-semibold text-text">Users</h1>
-
-        <Alert>{error}</Alert>
-
-        {loading ? (
-          <p className="text-text-muted">Loading...</p>
-        ) : (
-          <DataTable columns={columns} data={users} rowKey="_id" actions={getRowActions} />
-        )}
-      </div>
-    </div>
+      {loading ? (
+        <p className="text-text-muted">Loading...</p>
+      ) : (
+        <DataTable columns={columns} data={users} rowKey="_id" actions={getRowActions} />
+      )}
+    </AdminLayout>
   );
 }

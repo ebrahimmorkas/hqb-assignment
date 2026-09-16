@@ -38,6 +38,20 @@ export const TrashIcon = (
   </svg>
 );
 
+export const PlusIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base}>
+    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+  </svg>
+);
+
+export const UsersIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base}>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M2.5 19c.7-3.2 3.3-5 6.5-5s5.8 1.8 6.5 5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M16 4.3a3.2 3.2 0 0 1 0 6.2M21.5 19c-.5-2.4-2-4-4-4.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export const MenuIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
     <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />

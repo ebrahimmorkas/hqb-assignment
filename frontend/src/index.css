@@ -7,12 +7,14 @@
  * a token here restyles every screen that uses it.
  */
 @theme {
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
+  /* Corporate blue rather than the previous indigo/purple - reads more
+     "admin dashboard", less "marketing site". */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
   --color-primary-fg: #ffffff;
 
   --color-surface: #ffffff;
-  --color-background: #f8fafc;
+  --color-background: #f1f5f9;
   --color-border: #e2e8f0;
 
   --color-text: #0f172a;
@@ -20,6 +22,16 @@
 
   --color-danger: #dc2626;
   --color-danger-bg: #fef2f2;
+
+  --color-success: #16a34a;
+  --color-success-bg: #f0fdf4;
+
+  /* Dark sidebar, light content area - the single most recognizable visual
+     signature of an admin panel layout. */
+  --color-sidebar-bg: #111827;
+  --color-sidebar-hover: #1f2937;
+  --color-sidebar-text: #e5e7eb;
+  --color-sidebar-text-muted: #9ca3af;
 
   --radius-field: 0.5rem;
   --radius-card: 0.75rem;

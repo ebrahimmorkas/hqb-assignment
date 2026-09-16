@@ -5,7 +5,7 @@ import * as userApi from '../api/userApi';
 import { useWatanOptions } from '../hooks/useWatanOptions';
 import { EDIT_FIELDS } from '../constants/userFormFields';
 import { ROLES } from '../constants/roles';
-import Navbar from '../components/layout/Navbar';
+import AdminLayout from '../components/layout/AdminLayout';
 import UserForm from '../components/users/UserForm';
 import Alert from '../components/ui/Alert';
 
@@ -18,6 +18,7 @@ export default function EditUserPage() {
   const [targetUser, setTargetUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     userApi
@@ -28,35 +29,34 @@ export default function EditUserPage() {
   }, [id]);
 
   const handleSubmit = async (data) => {
-    await userApi.updateUser(id, data);
-    navigate('/');
+    const updated = await userApi.updateUser(id, data);
+    setTargetUser(updated);
+    setSuccess('Changes saved successfully.');
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <div className="mx-auto max-w-md px-4 py-8">
-        <h1 className="mb-6 text-xl font-semibold text-text">
-          {targetUser ? `Edit ${targetUser.name}` : 'Edit User'}
-        </h1>
+    <AdminLayout title={targetUser ? `Edit ${targetUser.name}` : 'Edit User'} maxWidth="max-w-md">
+      <Alert tone="danger" onClose={() => setError('')}>
+        {error}
+      </Alert>
+      <Alert tone="success" onClose={() => setSuccess('')}>
+        {success}
+      </Alert>
 
-        <Alert>{error}</Alert>
-
-        {loading ? (
-          <p className="text-text-muted">Loading...</p>
-        ) : (
-          targetUser && (
-            <UserForm
-              fields={EDIT_FIELDS[user.role]}
-              initialValues={targetUser}
-              watanOptions={watanOptions}
-              onSubmit={handleSubmit}
-              onCancel={() => navigate('/')}
-              submitLabel="Save changes"
-            />
-          )
-        )}
-      </div>
-    </div>
+      {loading ? (
+        <p className="text-text-muted">Loading...</p>
+      ) : (
+        targetUser && (
+          <UserForm
+            fields={EDIT_FIELDS[user.role]}
+            initialValues={targetUser}
+            watanOptions={watanOptions}
+            onSubmit={handleSubmit}
+            onCancel={() => navigate('/')}
+            submitLabel="Save changes"
+          />
+        )
+      )}
+    </AdminLayout>
   );
 }

@@ -51,6 +51,24 @@ const getUserById = async (req, res) => {
   }
 };
 
+const getUserByIts = async (req, res) => {
+  try {
+    const user = await userService.getUserByIts(req.params.its);
+
+    if (!user || !canManage(req.user.role, user)) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const visibleUser = req.user.role === ROLES.ADMIN ? stripWatan(user) : user;
+
+    res.status(200).json({ success: true, data: visibleUser });
+  } catch (err) {
+    logger.logException('getUserByIts failed', err);
+    const { statusCode, message } = normalizeError(err);
+    res.status(statusCode).json({ success: false, message });
+  }
+};
+
 const createUser = async (req, res) => {
   try {
     const user = await userService.createUser(req.body);
@@ -103,6 +121,7 @@ const deleteUser = handleStatusChange(userService.deleteUser, 'deleteUser failed
 module.exports = {
   getAllUsers,
   getUserById,
+  getUserByIts,
   createUser,
   updateUser,
   markInactive,

@@ -4,16 +4,30 @@ import Button from '../ui/Button';
 import { MenuIcon, CloseIcon } from '../ui/icons';
 
 // Reusable top nav for admin/super-admin pages. `children` are page-specific
-// action buttons (e.g. Create User) rendered before the always-present
-// Log out - the navbar itself doesn't know what those actions are.
-export default function Navbar({ children }) {
+// action buttons rendered before the always-present Log out - the navbar
+// itself doesn't know what those actions are. `onMenuClick`, if given,
+// renders a sidebar-toggle button next to the brand - separate from this
+// navbar's own mobile-only action menu toggle below.
+export default function Navbar({ children, onMenuClick }) {
   const { logout } = useAuth();
   const [open, setOpen] = useState(false);
 
   return (
     <nav className="border-b border-border bg-surface">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <span className="text-lg font-semibold text-text">hqhb</span>
+        <div className="flex items-center gap-2">
+          {onMenuClick && (
+            <button
+              type="button"
+              onClick={onMenuClick}
+              aria-label="Open sidebar"
+              className="rounded-field p-1.5 text-text hover:bg-border/50"
+            >
+              {MenuIcon}
+            </button>
+          )}
+          <span className="text-lg font-semibold text-text">hqhb</span>
+        </div>
 
         <div className="hidden items-center gap-3 sm:flex">
           {children}

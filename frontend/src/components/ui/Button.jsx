@@ -2,6 +2,8 @@ const VARIANTS = {
   primary:
     'bg-primary text-primary-fg hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed',
   ghost: 'bg-transparent text-text hover:bg-border/50',
+  danger:
+    'bg-danger text-primary-fg hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed',
 };
 
 export default function Button({

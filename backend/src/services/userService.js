@@ -47,6 +47,26 @@ async function getUserById(id) {
   }
 }
 
+async function getUserByIts(its) {
+  try {
+    // Excludes deleted users, same reasoning as auth login: ITS is only
+    // unique among non-deleted users, so a deleted account's ITS may have
+    // since been reissued to a brand new one - this must resolve to the
+    // live account, not a historical deleted one. Not cached (unlike
+    // getUserById) - this is a low-traffic lookup, not worth the extra
+    // cache-invalidation bookkeeping on every status/edit call.
+    const user = await User.findOne({ its, status: { $ne: STATUS.DELETED } })
+      .select('-password')
+      .lean();
+
+    logger.logInfo(!!user, !user, 'Fetched user by ITS', { its, found: !!user });
+
+    return user;
+  } catch (err) {
+    throw err;
+  }
+}
+
 async function createUser(data) {
   try {
     // Only super-admin can even reach this (route-gated), but don't trust
@@ -119,34 +139,59 @@ async function updateUser(id, data, actor) {
   }
 }
 
-// One rule per target status: who may set it, what the row must currently
-// be, and which rows they're allowed to touch at all (canManage - the same
-// rule the users-list row filter uses).
+const STATUS_LABELS = {
+  [STATUS.ACTIVE]: 'Active',
+  [STATUS.INACTIVE]: 'Inactive',
+  [STATUS.DELETED]: 'Deleted',
+};
+
+// One rule per target status: who may set it (given who the actor is AND
+// what role the target row has), what the row must currently be, which rows
+// they're allowed to touch at all (canManage - the same rule the users-list
+// row filter uses), and a human-readable message for when the current
+// status doesn't allow it - naming what's actually wrong (e.g. "already
+// Active") rather than a generic "must have status I" that means nothing to
+// whoever's reading it.
 const TRANSITIONS = {
   [STATUS.INACTIVE]: {
     actionName: 'markUserInactive',
-    allowedActorRoles: [ROLES.ADMIN],
+    // Admin deactivates a plain user (the normal case). A regular admin can
+    // never manage another admin's row at all (canManage blocks it
+    // entirely), so without this, an admin-role account could never be
+    // deactivated by anyone - super-admin bypasses the normal rule
+    // specifically for admin-role targets to close that gap.
+    isActorAllowed: (actorRole, targetRole) =>
+      (actorRole === ROLES.ADMIN && targetRole === ROLES.USER) ||
+      (actorRole === ROLES.SUPER_ADMIN && targetRole === ROLES.ADMIN),
     requiredCurrentStatus: STATUS.ACTIVE,
+    wrongStatusMessage: (currentStatus) =>
+      currentStatus === STATUS.INACTIVE
+        ? "Can't mark Inactive as user is already Inactive"
+        : `Can't mark Inactive as user is ${STATUS_LABELS[currentStatus]}`,
   },
   [STATUS.ACTIVE]: {
     actionName: 'markUserActive',
-    allowedActorRoles: [ROLES.SUPER_ADMIN],
+    isActorAllowed: (actorRole) => actorRole === ROLES.SUPER_ADMIN,
     requiredCurrentStatus: STATUS.INACTIVE,
+    wrongStatusMessage: (currentStatus) =>
+      currentStatus === STATUS.ACTIVE
+        ? "Can't mark Active as user is already Active"
+        : `Can't mark Active as user is ${STATUS_LABELS[currentStatus]}`,
   },
   [STATUS.DELETED]: {
     actionName: 'deleteUser',
-    allowedActorRoles: [ROLES.SUPER_ADMIN],
+    isActorAllowed: (actorRole) => actorRole === ROLES.SUPER_ADMIN,
     requiredCurrentStatus: STATUS.INACTIVE,
+    wrongStatusMessage: (currentStatus) =>
+      currentStatus === STATUS.ACTIVE
+        ? "Can't delete user as they are still Active - Ask admin to mark them Inactive first"
+        : `Can't delete user as they are ${STATUS_LABELS[currentStatus]}`,
   },
 };
 
 async function changeUserStatus(id, targetStatus, actor) {
   try {
     const rule = TRANSITIONS[targetStatus];
-
-    if (!rule.allowedActorRoles.includes(actor.role)) {
-      throw new ApiError(403, 'Forbidden');
-    }
 
     const user = await User.findById(id).select('+statusAudit');
 
@@ -156,11 +201,12 @@ async function changeUserStatus(id, targetStatus, actor) {
       throw new ApiError(403, 'Forbidden');
     }
 
+    if (!rule.isActorAllowed(actor.role, user.role)) {
+      throw new ApiError(403, 'Forbidden');
+    }
+
     if (user.status !== rule.requiredCurrentStatus) {
-      throw new ApiError(
-        400,
-        `User must have status "${rule.requiredCurrentStatus}" for this action`
-      );
+      throw new ApiError(400, rule.wrongStatusMessage(user.status));
     }
 
     user.status = targetStatus;
@@ -192,6 +238,7 @@ const deleteUser = (id, actor) => changeUserStatus(id, STATUS.DELETED, actor);
 module.exports = {
   getAllUsers,
   getUserById,
+  getUserByIts,
   createUser,
   updateUser,
   markUserInactive,
